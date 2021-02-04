@@ -44,18 +44,12 @@ module.exports = {
             const { username, email, password } = req.body
             const hashpass = cryptojs.HmacMD5(password, SECRET_KEY).toString()
 
-            let queryUser = ''
-            if(username && !email) {
-                queryUser = `SELECT id, uid, username, email, status, role FROM users 
-                WHERE username = '${username}' AND password = '${hashpass}' AND status = 1`
-            }
-            if(!username && email) {
-                queryUser = `SELECT id, uid, username, email, status, role FROM users 
-                WHERE email = '${email}' AND password = '${hashpass}' AND status = 1`
-            }
-
+            const QUERY = email ? `email = '${email}'` : `username = '${username}'`
+            let queryUser = `SELECT id, uid, username, email, status, role FROM users WHERE ` + QUERY + ` AND password = '${hashpass}'`
             const result = await asyncQuery(queryUser)
             if (result.length === 0) return res.status(400).send('Account doesn\'t exist')
+            if (result[0].status === 2) return res.status(400).send('This account doesn\'t active')
+            if (result[0].status === 3) return res.status(400).send('This account has been closed')
 
             result[0].token = createToken({uid: result[0].uid , role: result[0].role})
 
@@ -96,6 +90,7 @@ module.exports = {
             const userQuery = `SELECT u.uid, s.status FROM users u JOIN status s on u.status = s.id
             WHERE u.uid = ${+uid}`
             const resultUser = await asyncQuery(userQuery)
+            if(resultUser[0].status === 'closed') return res.status(400).send('Sorry your account has been closed')
 
             res.status(200).send(resultUser[0])
         }

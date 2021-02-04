@@ -1,17 +1,17 @@
 const { generateWhereQuery, asyncQuery } = require('../helper/queryHelp')
 
+const GET_MOVIE =  `SELECT m.name, m.release_date, m.release_month, m.release_year, m.duration_min, m.genre, 
+                    m.description, ms.status, l.location, st.time 
+                    FROM schedules s 
+                    JOIN movies m ON s.movie_id = m.id
+                    JOIN movie_status ms ON ms.id=m.status
+                    JOIN locations l ON s.location_id = l.id
+                    JOIN show_times st ON s.time_id = st.id`
+
 module.exports = {
     getAll: async(req, res) => {
         try{
-            const getQuery = `SELECT m.name, m.release_date, m.release_month, m.release_year, m.duration_min, m.genre, 
-            m.description, m.status, l.location, st.time 
-            FROM schedules s 
-            JOIN locations l ON s.location_id = l.id
-            JOIN show_times st ON s.time_id = st.id
-            JOIN (SELECT m.id, m.name, m.release_date, m.release_month, m.release_year, m.duration_min, m.genre, 
-            m.description, ms.status FROM movies m JOIN movie_status ms ON m.status=ms.id) m ON s.movie_id = m.id;`
-
-            const result = await asyncQuery(getQuery)
+            const result = await asyncQuery(GET_MOVIE)
 
             res.status(200).send(result)
         }
@@ -23,14 +23,13 @@ module.exports = {
 
     getByQuery: async(req, res) => {
         try{
-            const getQuery = `SELECT m.name, m.release_date, m.release_month, m.release_year, m.duration_min, m.genre, 
-            m.description, m.status, l.location, st.time 
-            FROM schedules s 
-            JOIN locations l ON s.location_id = l.id
-            JOIN show_times st ON s.time_id = st.id
-            JOIN (SELECT m.id, m.name, m.release_date, m.release_month, m.release_year, m.duration_min, m.genre, 
-            m.description, ms.status FROM movies m JOIN movie_status ms ON m.status=ms.id) m ON s.movie_id = m.id
-            WHERE${generateWhereQuery(req.query)}`
+            const { location, time, status } = req.query
+            let FILTER = ` WHERE ms.id != 3`
+            location ? FILTER += ` AND l.location = '${location}'` : ''
+            time ? FILTER += ` AND st.time = ${time}` : ''
+            status ? FILTER += ` AND ms.status = '${status}'` : ''
+
+            const getQuery = GET_MOVIE + FILTER
 
             const result = await asyncQuery(getQuery)
 
@@ -63,10 +62,7 @@ module.exports = {
 
     editStatus: async(req, res) => {
         try{
-            const { uid, role } = req.user
-            const adminQuery = `SELECT * FROM users WHERE uid = ${+uid} AND role = 1`
-            const adminResult = await asyncQuery(adminQuery)
-            if(adminResult.length === 0) return res.status(400).send('You cannot edit status')
+            if(req.user.role !== 1) return res.status(400).send('Access denied')
 
             const id = +req.params.id
             const queryMovie = `SELECT * FROM movies WHERE id = ${id}`
@@ -90,10 +86,7 @@ module.exports = {
 
     addSchedule: async(req, res) => {
         try{
-            const { uid, role } = req.user
-            const adminQuery = `SELECT * FROM users WHERE uid = ${+uid} AND role = 1`
-            const adminResult = await asyncQuery(adminQuery)
-            if(adminResult.length === 0) return res.status(400).send('You cannot add schedule')
+            if(req.user.role !== 1) return res.status(400).send('Access denied')
 
             const id = +req.params.id
             const querySchedule = `SELECT * FROM movies WHERE id = ${id}`
